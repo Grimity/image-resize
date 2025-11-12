@@ -24,6 +24,9 @@ export const handler = async (
     return request; // 이미 리사이즈된 이미지 요청이면 무시
   }
 
+  console.log('Original URI:', uri);
+  console.log('Querystring:', querystring);
+
   const params = new URLSearchParams(querystring);
   const sizeParam = params.get('s');
   console.log('Requested size:', sizeParam);
