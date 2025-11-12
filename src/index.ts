@@ -10,7 +10,7 @@ import sharp from 'sharp';
 const s3Client = new S3Client({
   region: process.env.AWS_REGION || 'ap-northeast-2',
 });
-const BUCKET_NAME = process.env.BUCKET_NAME;
+const BUCKET_NAME = 'grimity-image-prod';
 const ALLOWED_SIZES = [300, 600, 1200];
 
 export const handler = async (
@@ -26,6 +26,7 @@ export const handler = async (
 
   const params = new URLSearchParams(querystring);
   const sizeParam = params.get('s');
+  console.log('Requested size:', sizeParam);
 
   // 쿼리스트링이 없으면 원본 이미지 그대로 반환
   if (!sizeParam) {
@@ -35,12 +36,14 @@ export const handler = async (
   // 허용된 사이즈만 처리
   const requestedSize = parseInt(sizeParam);
   if (!ALLOWED_SIZES.includes(requestedSize)) {
+    console.log('Requested size is not allowed:', requestedSize);
     return request; // 허용되지 않은 사이즈면 원본 반환
   }
 
   try {
     const originalKey = uri.startsWith('/') ? uri.slice(1) : uri;
     const resizedKey = `resized/${requestedSize}/${originalKey}`;
+    console.log('Resized image key:', resizedKey);
 
     // 1. 리사이징된 이미지가 S3에 존재하는지 확인
     const resizedExists = await checkS3ObjectExists(resizedKey);
@@ -73,6 +76,7 @@ export const handler = async (
   } catch (error) {
     console.error('Error processing image:', error);
     // 에러 발생 시 원본 이미지 반환
+    console.log('Error', error);
     return request;
   }
 };
