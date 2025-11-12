@@ -1,0 +1,39 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build
+        run: |
+          npm install
+          npx tsc -p tsconfig.build.json
+          npm install --omit=dev
+          mv node_modules dist/
+          cd dist
+          zip -r ../dist.zip .
+          cd ..
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: github-actions
+          aws-region: ap-northeast-2
+
+      - name: Upload to Lambda
+        run: |
+          aws lambda update-function-code --function-name ${{secrets.AWS_LAMBDA_FUNCTION_NAME}} --zip-file fileb://dist.zip
