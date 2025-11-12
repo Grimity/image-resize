@@ -32,7 +32,7 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           role-session-name: github-actions
-          aws-region: ap-northeast-2
+          aws-region: us-east-1
 
       - name: Upload to Lambda
         run: |
