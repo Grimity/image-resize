@@ -10,7 +10,6 @@ import sharp from 'sharp';
 const s3Client = new S3Client({
   region: process.env.AWS_REGION || 'ap-northeast-2',
 });
-const BUCKET_NAME = 'grimity-image-prod';
 const ALLOWED_SIZES = [300, 600, 1200];
 
 export const handler = async (
@@ -18,6 +17,9 @@ export const handler = async (
 ): Promise<CloudFrontRequestResult> => {
   const request = event.Records[0]?.cf.request;
   if (!request) return null;
+
+  const BUCKET_NAME = request.origin?.s3?.domainName?.split('.')[0];
+  if (!BUCKET_NAME) return request;
 
   const { uri, querystring } = request;
   if (uri.startsWith('/resized')) {
@@ -49,7 +51,7 @@ export const handler = async (
     console.log('Resized image key:', resizedKey);
 
     // 1. 리사이징된 이미지가 S3에 존재하는지 확인
-    const resizedExists = await checkS3ObjectExists(resizedKey);
+    const resizedExists = await checkS3ObjectExists(BUCKET_NAME, resizedKey);
 
     if (resizedExists) {
       // 리사이징된 이미지가 이미 존재하면 해당 경로로 변경
@@ -57,7 +59,7 @@ export const handler = async (
       return request;
     }
 
-    const originalImage = await getS3Object(originalKey);
+    const originalImage = await getS3Object(BUCKET_NAME, originalKey);
 
     if (!originalImage) {
       return request; // 원본도 없으면 그냥 원본 경로로 반환 (404 처리)
@@ -68,6 +70,7 @@ export const handler = async (
 
     // 4. 리사이징된 이미지를 S3에 저장
     await putS3Object(
+      BUCKET_NAME,
       resizedKey,
       resizedImage.buffer,
       resizedImage.contentType
@@ -84,11 +87,11 @@ export const handler = async (
   }
 };
 
-async function checkS3ObjectExists(key: string): Promise<boolean> {
+async function checkS3ObjectExists(bucket: string, key: string): Promise<boolean> {
   try {
     await s3Client.send(
       new HeadObjectCommand({
-        Bucket: BUCKET_NAME,
+        Bucket: bucket,
         Key: key,
       })
     );
@@ -101,10 +104,10 @@ async function checkS3ObjectExists(key: string): Promise<boolean> {
   }
 }
 
-async function getS3Object(key: string): Promise<Buffer | null> {
+async function getS3Object(bucket: string, key: string): Promise<Buffer | null> {
   try {
     const command = new GetObjectCommand({
-      Bucket: BUCKET_NAME,
+      Bucket: bucket,
       Key: key,
     });
     const response = await s3Client.send(command);
@@ -128,13 +131,14 @@ async function getS3Object(key: string): Promise<Buffer | null> {
 }
 
 async function putS3Object(
+  bucket: string,
   key: string,
   buffer: Buffer,
   contentType: string
 ): Promise<void> {
   await s3Client.send(
     new PutObjectCommand({
-      Bucket: BUCKET_NAME,
+      Bucket: bucket,
       Key: key,
       Body: buffer,
       ContentType: contentType,
